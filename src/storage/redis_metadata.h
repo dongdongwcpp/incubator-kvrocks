@@ -39,6 +39,7 @@ enum RedisType {
   kRedisBitmap,
   kRedisSortedint,
   kRedisStream,
+  kRedisHyperLogLog,
 };
 
 enum RedisCommand {
@@ -171,4 +172,13 @@ class StreamMetadata : public Metadata {
  public:
   void Encode(std::string *dst) override;
   rocksdb::Status Decode(const std::string &bytes) override;
+};
+
+
+class HyperloglogMetadata : public Metadata{
+  public:
+    explicit HyperloglogMetadata(bool generate_version = true) ;
+    rocksdb::Status Decode(const std::string &bytes) override;
+    void Encode(std::string *dst) override;
+    rocksdb::Status DecodeAndRemovePrefix(std::string *bytes);
 };

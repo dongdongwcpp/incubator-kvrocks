@@ -223,7 +223,7 @@ timeval Metadata::Time() const {
 }
 
 bool Metadata::LazyExpired() const{
-  if (Type() != kRedisString && Type() != kRedisStream && size == 0) {
+  if (Type() != kRedisString && Type() != kRedisStream && Type() != kRedisHyperLogLog && size == 0) {
     return true;
   }
 
@@ -235,7 +235,7 @@ bool Metadata::LazyExpired() const{
   return lazy_expire < now;
 }
 bool Metadata::Expired() const {
-  if (Type() != kRedisString && Type() != kRedisStream && size == 0) {
+  if (Type() != kRedisString && Type() != kRedisStream && Type() != kRedisHyperLogLog && size == 0) {
     return true;
   }
 
@@ -333,4 +333,29 @@ rocksdb::Status StreamMetadata::Decode(const std::string &bytes) {
   GetFixed64(&input, &entries_added);
 
   return rocksdb::Status::OK();
+}
+
+HyperloglogMetadata::HyperloglogMetadata(bool generate_version): Metadata(kRedisHyperLogLog, generate_version) {
+}
+
+rocksdb::Status HyperloglogMetadata::Decode(const std::string &bytes){
+    // flags(1byte) + expire (4byte) same as string
+    if (bytes.size() < 5){
+        return rocksdb::Status::InvalidArgument("hyperloglog metadata is too short");
+    }
+    Slice input(bytes);
+    GetFixed8(&input, &flags);
+    GetFixed32(&input, reinterpret_cast<uint32_t *>(&expire));
+    return rocksdb::Status::OK();
+}
+
+rocksdb::Status HyperloglogMetadata::DecodeAndRemovePrefix(std::string *bytes){
+    auto s = Decode(*bytes);
+    if(!s.ok()) return s;
+    *bytes = bytes->substr(5, bytes->size() - 5);
+    return rocksdb::Status::OK();
+}
+void HyperloglogMetadata::Encode(std::string* dst){
+    PutFixed8(dst, flags);
+    PutFixed32(dst, (uint32_t)expire);
 }
